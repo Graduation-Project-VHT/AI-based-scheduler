@@ -1,0 +1,7 @@
+[project]
+name = "ai-based-scheduler"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11,<3.12" # Keeps the Python version below 3.12
+dependencies = []
