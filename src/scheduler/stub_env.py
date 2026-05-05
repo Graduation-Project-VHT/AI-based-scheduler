@@ -10,6 +10,31 @@ stub_env.py — Synthetic LTE environment for offline DQN prototyping.
 import numpy as np
 from config import ENV
 
+# Modulation scheme lookup table
+# Source: 3GPP TS 36.213 Table 7.2.3-1
+CQI_BYTES_PER_RB = {
+    1:   2,   # QPSK,   efficiency 0.1523
+    2:   4,   # QPSK,   efficiency 0.2344
+    3:   6,   # QPSK,   efficiency 0.3770
+    4:  10,   # QPSK,   efficiency 0.6016
+    5:  15,   # QPSK,   efficiency 0.8770
+    6:  21,   # QPSK,   efficiency 1.1758
+    7:  26,   # 16-QAM, efficiency 1.4766
+    8:  34,   # 16-QAM, efficiency 1.9141
+    9:  43,   # 16-QAM, efficiency 2.4063
+    10: 49,   # 64-QAM, efficiency 2.7305
+    11: 59,   # 64-QAM, efficiency 3.3223
+    12: 70,   # 64-QAM, efficiency 3.9023
+    13: 81,   # 64-QAM, efficiency 4.5234
+    14: 92,   # 64-QAM, efficiency 5.1152
+    15: 100,  # 64-QAM, efficiency 5.5547
+}
+
+# Convert to numpy array for vectorized lookup (index 0 unused, CQI starts at 1)
+_CQI_BYTES_ARRAY = np.array(
+    [0] + [CQI_BYTES_PER_RB[cqi] for cqi in range(1, 16)],
+    dtype=np.float32
+)
 
 class StubLTEEnv:
     """
@@ -145,10 +170,12 @@ class StubLTEEnv:
         - HOL delay increases if buffer is non-empty, resets if drained
         - EWMA throughput updates with α=0.1 (slow moving average)
         """
+        # bytes_per_rb = self._cqi * 50.0   # shape (n_ues,)
+
         # Bytes delivered per RB is proportional to CQI
-        # CQI 15 ≈ 64-QAM 4/5 coding ≈ ~7Mbps for 1 RB in 5MHz
-        # We use a simple linear mapping: bytes_per_rb = cqi * 50 (rough approximation)
-        bytes_per_rb = self._cqi * 50.0   # shape (n_ues,)
+        # Vectorized lookup: for each UE, look up its CQI in the table
+        cqi_indices = self._cqi.astype(np.int32)          # float CQI → int index
+        bytes_per_rb = _CQI_BYTES_ARRAY[cqi_indices]      # shape (n_ues,)
 
         # Total bytes delivered this TTI per UE
         bytes_delivered = self._rbs_allocated * bytes_per_rb   # shape (n_ues,)
@@ -204,7 +231,12 @@ class StubLTEEnv:
         hol_norm = self._hol_delay / ENV.hol_max
 
         # Max possible EWMA tput: CQI=15, all RBs, in kbps
-        max_tput = ENV.cqi_max * 50.0 * self.n_usable_rbs * 8 / 1e3
+        # max_tput = ENV.cqi_max * 50.0 * self.n_usable_rbs * 8 / 1e3
+        # tput_norm = np.clip(self._ewma_tput / max_tput, 0.0, 1.0)
+
+        # Max possible EWMA tput: CQI=15 (100 bytes/RB), all 43 RBs, in kbps
+        # 100 bytes × 43 RBs × 8 bits / 1ms TTI = 34,400 kbps per UE (theoretical max)
+        max_tput = CQI_BYTES_PER_RB[15] * ENV.n_usable_rbs * 8 / 1.0  # kbps
         tput_norm = np.clip(self._ewma_tput / max_tput, 0.0, 1.0)
 
         # QCI normalization: map integer class to [0, 1]
