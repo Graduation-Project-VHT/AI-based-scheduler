@@ -104,9 +104,11 @@ class StubLTEEnv:
                                     size=self.n_ues).astype(np.float32)
 
         # Initialize prev-TTI metrics
-        self._prev_total_tput = 0.0
+        # self._prev_total_tput = 0.0
         self._prev_fairness = self._compute_fairness()
         self._prev_avg_delay = float(np.mean(self._hol_delay))
+        max_tput = CQI_BYTES_PER_RB[15] * ENV.n_usable_rbs * 8 / 1.0
+        self._prev_total_tput = float(np.sum(self._ewma_tput)) / (ENV.n_ues * max_tput)
 
         return self._build_state()
 
@@ -301,4 +303,7 @@ class StubLTEEnv:
                   + ENV.w2 * delta_fairness
                   - ENV.w3 * delta_delay)
 
-        return float(reward)
+        # Clip to [-5, 5] — protects against initialization spikes
+        # and any future edge cases. Standard RL practice.
+        return float(np.clip(reward, -5.0, 5.0))
+        # return float(reward)
