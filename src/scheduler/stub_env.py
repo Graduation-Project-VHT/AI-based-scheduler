@@ -8,7 +8,7 @@ stub_env.py — Synthetic LTE environment for offline DQN prototyping.
 """
 
 import numpy as np
-from config import ENV
+from .config import ENV
 
 # Modulation scheme lookup table
 # Source: 3GPP TS 36.213 Table 7.2.3-1
