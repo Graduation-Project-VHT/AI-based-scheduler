@@ -11,3 +11,5 @@ wheels/
 
 # Logs directory
 logs
+venv/
+__pycache__/
