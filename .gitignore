@@ -13,3 +13,5 @@ wheels/
 logs
 venv/
 __pycache__/
+checkpoints/dqn_ep*.pth
+runs/
