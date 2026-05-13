@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.12" # Keeps the Python version below 3.12
 dependencies = [
     "config>=0.5.1",
     "numpy>=2.4.4",
+    "pandas>=3.0.3",
     "pytest>=9.0.3",
     "pytest-html>=4.2.0",
     "tensorboard>=2.20.0",

@@ -9,12 +9,14 @@ from src.scheduler.config import ENV, DQN
 from src.scheduler.stub_env import StubLTEEnv
 from src.scheduler.dqn_agent import DQNAgent
 
-def get_epsilon(global_step):
-    """ FOOTGUN 4: epsilon-decay off-by-one """
-    if global_step >= DQN.epsilon_decay_steps:
+def get_epsilon(global_step, total_decay_steps):
+    """ 
+    Hàm tính Epsilon động: Tự động co giãn theo tổng số Steps 
+    """
+    if global_step >= total_decay_steps:
         return DQN.epsilon_end
     
-    decay_rate = (DQN.epsilon_start - DQN.epsilon_end) / DQN.epsilon_decay_steps
+    decay_rate = (DQN.epsilon_start - DQN.epsilon_end) / total_decay_steps
     return DQN.epsilon_start - (global_step * decay_rate)
 
 def main():
@@ -27,10 +29,16 @@ def main():
     agent = DQNAgent(state_dim=ENV.state_dim, n_actions=ENV.n_ues)
 
     global_step = 0
-    N_EPISODES = 500
+    N_EPISODES = 5000
 
-    print(f"Starting Training: {run_name}")
-    print(f"State dim: {ENV.state_dim}, Actions: {ENV.n_ues}")
+    # [FIX] Tự động tính toán Epsilon Decay theo tổng số bước
+    # Ép AI dành 80% chặng đường để vừa khám phá vừa học, 20% cuối để khai thác
+    TOTAL_STEPS = N_EPISODES * ENV.max_steps_per_episode
+    EXPLORATION_STEPS = int(TOTAL_STEPS * 0.8)
+
+    print(f"🚀 Starting Training: {run_name}")
+    print(f"📊 State dim: {ENV.state_dim}, Actions: {ENV.n_ues}")
+    print(f"🎯 Total Episodes: {N_EPISODES} | Exploration Steps: {EXPLORATION_STEPS}")
 
     for episode in range(N_EPISODES):
         state = env.reset()
@@ -40,7 +48,8 @@ def main():
         done = False
 
         while not done:
-            epsilon = get_epsilon(global_step)
+            # Dùng EXPLORATION_STEPS vừa tính toán thay vì đọc từ config
+            epsilon = get_epsilon(global_step, EXPLORATION_STEPS)
             action = agent.select_action(state, epsilon)
 
             next_state, reward, done, info = env.step(action)
@@ -71,15 +80,18 @@ def main():
         writer.add_scalar("Train/Average_Q", avg_q, episode)
         writer.add_scalar("Hyperparams/Epsilon", epsilon, episode)
 
-        if episode % 10 == 0:
-            print(f"Ep {episode:3d} | Reward: {episode_reward:7.2f} | Loss: {avg_loss:5.3f} | Epsilon: {epsilon:.3f} | Step: {global_step}")
+        # [FIX] Giảm tần suất in log xuống mỗi 50 episodes để console đỡ rối
+        if episode % 50 == 0:
+            print(f"Ep {episode:4d} | Reward: {episode_reward:7.2f} | Loss: {avg_loss:5.3f} | Epsilon: {epsilon:.3f} | Step: {global_step}")
 
+        # Lưu checkpoint (Không cần lưu mốc 0)
         if episode % DQN.checkpoint_interval == 0 and episode > 0:
             agent.save_checkpoint(f"checkpoints/dqn_ep{episode}.pth")
 
+    # Lưu Model Cuối cùng
     agent.save_checkpoint(f"checkpoints/dqn_final.pth")
     writer.close()
-    print("Training Complete!")
+    print("✅ Training Complete! Model saved successfully.")
 
 if __name__ == "__main__":
     main()
